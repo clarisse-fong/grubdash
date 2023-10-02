@@ -14,15 +14,15 @@ function list(req, res, next) {
   res.send({ data: dishes });
 }
 
-//checks if dish exists. If it does, saves foundDish to res.locals.dish and moves onto the next tension. If it doesn't, sends a 404 error
+//This function checks if the dish exists. If it does, saves foundDish to res.locals.dish and moves onto the next tension. If it doesn't, sends a 404 error
 const dishExists = (req, res, next) => {
-  //see if the dish exists
+  //checks if the dish exists
   const { dishId } = req.params;
   const foundDish = dishes.find((d) => {
     return d.id === dishId;
   });
   if (foundDish) {
-    //save dish to res.locals
+    //if it exists, save dish to res.locals
     res.locals.dish = foundDish;
     next();
   } else {
@@ -32,12 +32,11 @@ const dishExists = (req, res, next) => {
 
 //This function will respond with the dish where id === :dishId or return 404 if no matching dish is found.
 function read(req, res, next) {
-  const { dishId } = req.params;
   const foundDish = res.locals.dish;
   res.send({ data: foundDish });
 }
 
-//validates dish price property
+//This function validates dish price property.
 const validatesPrice = (req, res, next) => {
   const input = req.body.data.price;
 
@@ -50,7 +49,7 @@ const validatesPrice = (req, res, next) => {
       status: 400,
       message: "Dish must have a price that is an integer greater than 0",
     });
-  } else if (isNaN(Number(input))) {
+  } else if (typeof input !== "number") {
     //checks that dish price is a number
     next({
       status: 400,
@@ -61,7 +60,7 @@ const validatesPrice = (req, res, next) => {
   }
 };
 
-//validates for a given dish property, if the dish property exists and is not empty
+//This function validates for a given dish property if the dish property exists and is not empty.
 const validateFor = (property) => {
   return function (req, res, next) {
     const input = req.body.data[property];
@@ -74,7 +73,7 @@ const validateFor = (property) => {
 };
 
 //This function will save the dish and respond with the newly created dish.
-function update(req, res, next) {
+function create(req, res, next) {
   const {
     data: { name, description, price, image_url },
   } = req.body;
@@ -90,10 +89,49 @@ function update(req, res, next) {
   res.status(201).send({ data: newDish });
 }
 
+function validatesCorrectIdToUpdate(req, res, next) {
+  const { dishId: routeId } = req.params;
+  const dishId = req.body.data.id;
+  if (!dishId) {
+    return next();
+  } else if (routeId === dishId) {
+    next();
+  } else {
+    next({
+      status: 400,
+      message: `Dish id does not match route id. Dish: ${dishId}, Route: ${routeId}`,
+    });
+  }
+}
+
+//This function will update the dish where id === :dishId or return 404 if no matching dish is found.
+function update(req, res, next) {
+  const foundDish = res.locals.dish;
+  const {
+    data: { name, description, price, image_url },
+  } = req.body;
+
+  foundDish.name = name;
+  foundDish.description = description;
+  foundDish.price = price;
+  foundDish.image_url = image_url;
+
+  res.send({ data: foundDish });
+}
+
 module.exports = {
   list,
   read: [dishExists, read],
+  create: [
+    validatesPrice,
+    validateFor("name"),
+    validateFor("description"),
+    validateFor("image_url"),
+    create,
+  ],
   update: [
+    dishExists,
+    validatesCorrectIdToUpdate,
     validatesPrice,
     validateFor("name"),
     validateFor("description"),
